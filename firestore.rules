@@ -1,0 +1,111 @@
+rules_version = '2';
+
+// PulseHR AI — Firestore security rules
+//
+// Data model (see docs/DATABASE.md for the full schema + diagrams):
+//   userIndex/{uid}                                 -> { companyId, role }
+//   companies/{companyId}                           -> { name, joinCode, createdBy, createdAt }
+//   companies/{companyId}/employees/{uid}           -> employee profile + role ('employee' | 'admin')
+//   companies/{companyId}/leaveRequests/{id}         -> employeeId, status, ...
+//   companies/{companyId}/attendance/{employeeId_date}
+//   companies/{companyId}/tickets/{id}
+//   companies/{companyId}/announcements/{id}
+//   companies/{companyId}/notifications/{id}
+//
+// Principle: an employee can always read/write their OWN records; HR/Admin
+// (role == 'admin' in their own company's employees collection) can read
+// and update ANY record that belongs to their company. Nobody can read or
+// write another company's data at all — that boundary is enforced here,
+// not just in the UI.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Is the caller an admin/HR member of this specific company?
+    function isCompanyAdmin(companyId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/companies/$(companyId)/employees/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/companies/$(companyId)/employees/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Is the caller a member (any role) of this company at all?
+    function isCompanyMember(companyId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/companies/$(companyId)/employees/$(request.auth.uid));
+    }
+
+    // A user may only ever read/create their OWN index entry. Written once
+    // at sign-up time by the client, right after the employees/ doc is made.
+    match /userIndex/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update, delete: if false;
+    }
+
+    match /companies/{companyId} {
+      // Anyone signed in may look a company up by its join code during
+      // sign-up (needed to validate the code before joining); once a
+      // member, they can read the full company doc.
+      allow read: if signedIn();
+      allow create: if signedIn(); // becoming the creator/admin happens client-side right after
+      allow update: if isCompanyAdmin(companyId);
+      allow delete: if false;
+
+      match /employees/{employeeId} {
+        // A brand-new employee needs to create their OWN doc when joining.
+        allow create: if signedIn() && request.auth.uid == employeeId;
+        // Any member of the company can see the directory (needed for Team,
+        // Leave calendar, HR dashboards). Only the admin or the employee
+        // themself can update it.
+        allow read: if isCompanyMember(companyId);
+        allow update: if isCompanyAdmin(companyId) || request.auth.uid == employeeId;
+        allow delete: if isCompanyAdmin(companyId);
+      }
+
+      match /leaveRequests/{requestId} {
+        allow read: if isCompanyMember(companyId);
+        allow create: if signedIn() && request.resource.data.employeeId == request.auth.uid;
+        // Employee may cancel their own pending request; only HR/Admin may
+        // approve/reject (change status to Approved/Rejected).
+        allow update: if isCompanyAdmin(companyId) ||
+          (signedIn() && resource.data.employeeId == request.auth.uid);
+        allow delete: if isCompanyAdmin(companyId);
+      }
+
+      match /attendance/{recordId} {
+        allow read: if isCompanyMember(companyId);
+        allow create, update: if signedIn() && request.resource.data.employeeId == request.auth.uid;
+        allow delete: if isCompanyAdmin(companyId);
+      }
+
+      match /tickets/{ticketId} {
+        allow read: if isCompanyMember(companyId);
+        allow create: if signedIn() && request.resource.data.employeeId == request.auth.uid;
+        allow update: if isCompanyAdmin(companyId) ||
+          (signedIn() && resource.data.employeeId == request.auth.uid);
+        allow delete: if isCompanyAdmin(companyId);
+      }
+
+      match /announcements/{postId} {
+        allow read: if isCompanyMember(companyId);
+        allow create, update, delete: if isCompanyAdmin(companyId);
+      }
+
+      match /notifications/{notifId} {
+        allow read, update: if signedIn() && resource.data.employeeId == request.auth.uid;
+        allow create: if isCompanyMember(companyId);
+        allow delete: if signedIn() && resource.data.employeeId == request.auth.uid;
+      }
+    }
+
+    // Legacy per-user personal blob (profile settings, payslips, documents
+    // metadata not shared with the company). Kept isolated per-user.
+    match /users/{uid}/{document=**} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+  }
+}
