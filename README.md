@@ -1,5 +1,71 @@
 # PulseHR AI
 
+<div align="center">
+  <a href="YOUR_LIVE_DEMO_LINK_HERE">
+    <img src="https://img.shields.io/badge/Live%20Demo-%F0%9F%9A%80-blue?style=for-the-badge" alt="Live Demo" />
+  </a>
+  &nbsp;&nbsp;
+  <a href="YOUR_YOUTUBE_LINK_HERE">
+    <img src="https://img.shields.io/badge/YouTube%20Video-%F0%9F%8E%AC-red?style=for-the-badge" alt="YouTube Video" />
+  </a>
+</div>
+<br/>
+
+## 🏆 HACKATHON JUDGES: HOW TO TEST
+
+Welcome judges! To truly experience this application, you must test the real-time syncing and the Agentic AI. The app works instantly with **zero configuration** (using a `BroadcastChannel` local backend).
+
+### Step 1: Real-Time Sync Testing (Requires 2 Tabs)
+1. Open the Live Demo link in **Tab 1**. Sign up as **HR/Admin**. Note the 6-character Company Join Code.
+2. Open the Live Demo link in **Tab 2** (side-by-side). Sign up as **Employee** using that Join Code.
+3. In the Employee tab, submit a leave request or check-in for attendance.
+4. Watch the HR tab update **instantly** without refreshing.
+
+#### 🏗️ Real-Time Event Architecture Diagram
+*As required by the evaluation criteria, here is the real-time synchronization event flow diagram:*
+```mermaid
+sequenceDiagram
+    participant E as Employee Tab
+    participant Store as companyStore.js
+    participant EventBus as BroadcastChannel / Firestore
+    participant HR as HR Admin Tab
+
+    %% Employee submits a leave request
+    E->>Store: submitLeaveRequest({ type: "Sick" })
+    
+    %% Store writes data
+    Note over Store: Write to Storage<br/>(localStorage or Firestore)
+    
+    %% Store triggers sync event
+    Store->>EventBus: Publish Sync Event
+    
+    %% Event Bus pushes to other clients
+    EventBus-->>HR: Push Notification / Snapshot Update
+    
+    %% HR UI updates automatically
+    Note over HR: UI Re-renders via<br/>React useEffect listener
+    HR-->>HR: Displays New Leave Request
+    
+    %% HR Approves the request
+    HR->>Store: decideLeaveRequest(requestId, 'Approved')
+    
+    %% Store writes approval
+    Note over Store: Update Storage<br/>(Status: Approved)
+    
+    %% Sync back to employee
+    Store->>EventBus: Publish Sync Event
+    EventBus-->>E: Push Notification / Snapshot Update
+    Note over E: Employee sees "Approved"<br/>status instantly
+```
+
+### Step 2: Agentic AI Function Calling Testing
+This app features a fully autonomous Agentic AI powered by Gemini 2.5 Flash.
+1. Go to the **Assistant** tab.
+2. Ask the AI: *"My laptop screen is broken, please raise a ticket for me."*
+3. The AI will autonomously extract the intent, prioritize the issue, and execute a background function to insert a real ticket into the database. Check the Helpdesk tab to see it!
+
+---
+
 A mobile-first HR platform with **two genuinely different, permission-separated apps sharing one live company**: an Employee experience and an HR/Admin experience. When HR approves a leave request, the employee sees it change within seconds. When an employee joins with a company code, they instantly appear in HR's directory. That connection is real — enforced by database security rules, not just by the UI.
 
 ```
