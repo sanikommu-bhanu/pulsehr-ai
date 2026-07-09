@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, QrCode, ScanFace } from 'lucide-react'
+import { MapPin, QrCode, ScanFace, X } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import { Scanner } from '@yudiel/react-qr-scanner'
 import { useAuth } from '../../context/AuthContext'
 import { checkIn, checkOut, subscribeAttendance, subscribeAttendanceHistory } from '../../lib/companyStore'
 import PageHeader from '../../components/PageHeader'
@@ -40,13 +41,27 @@ export function CheckIn() {
   }
 
   function simulateScan(type) {
-    if (busy || checkedIn) return // usually scan only for check-in, or allow checkout too. Allow both.
     if (busy) return
     setScanning(type)
-    setTimeout(async () => {
-      await toggle()
+    if (type === 'face') {
+      setTimeout(async () => {
+        await toggle()
+        setScanning(null)
+      }, 2000)
+    }
+  }
+
+  async function handleRealScan(detectedCodes) {
+    if (busy || !detectedCodes || detectedCodes.length === 0) return
+    // As soon as ANY QR code is detected, check them in
+    setBusy(true)
+    try {
+      if (!todayRecord) await checkIn(companyId, user.uid, user.displayName || user.email)
+      else await checkOut(companyId, user.uid)
+    } finally {
+      setBusy(false)
       setScanning(null)
-    }, 2000)
+    }
   }
 
   const checkedIn = Boolean(todayRecord && !todayRecord.checkOut)
@@ -93,15 +108,25 @@ export function CheckIn() {
 
         {/* Scanning Overlay */}
         {scanning && (
-          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="relative flex h-48 w-48 items-center justify-center rounded-3xl border-4 border-dashed border-accent-blue/30 bg-accent-blue/5">
-              <div className="absolute top-0 h-1 w-full bg-accent-blue/50 shadow-[0_0_15px_rgba(37,99,235,0.5)] animate-[scan_1.5s_ease-in-out_infinite]" />
-              {scanning === 'qr' ? <QrCode size={64} className="text-accent-blue" /> : <ScanFace size={64} className="text-accent-blue" />}
-            </div>
-            <p className="mt-6 text-lg font-bold text-neutral-900 animate-pulse">
-              {scanning === 'qr' ? 'Scanning QR Code...' : 'Recognizing Face...'}
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-sm animate-in fade-in duration-200">
+            <button onClick={() => setScanning(null)} className="absolute top-6 right-6 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
+              <X size={24} />
+            </button>
+            
+            {scanning === 'qr' ? (
+              <div className="w-full max-w-[320px] overflow-hidden rounded-3xl border-4 border-accent-blue/30 bg-black">
+                <Scanner onScan={handleRealScan} formats={['qr_code']} />
+              </div>
+            ) : (
+              <div className="relative flex h-48 w-48 items-center justify-center rounded-3xl border-4 border-dashed border-accent-blue/30 bg-accent-blue/5">
+                <div className="absolute top-0 h-1 w-full bg-accent-blue/50 shadow-[0_0_15px_rgba(37,99,235,0.5)] animate-[scan_1.5s_ease-in-out_infinite]" />
+                <ScanFace size={64} className="text-accent-blue" />
+              </div>
+            )}
+            
+            <p className="mt-8 text-lg font-bold text-white animate-pulse">
+              {scanning === 'qr' ? 'Point camera at Office QR Code' : 'Recognizing Face...'}
             </p>
-            <p className="mt-2 text-sm text-neutral-500">Hold steady</p>
           </div>
         )}
 

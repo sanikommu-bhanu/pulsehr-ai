@@ -1,8 +1,43 @@
 import { GoogleGenAI } from '@google/genai'
 import { firestore as db } from '../firebase'
-import { doc, collection, addDoc, getDocs, query, orderBy, serverTimestamp, limit } from 'firebase/firestore'
+import { doc, collection, addDoc, getDocs, query, orderBy, serverTimestamp, limit, deleteDoc } from 'firebase/firestore'
 import { GEMINI_MODEL, SYSTEM_PROMPTS } from '../constants/aiConstants'
 import { parseAiError, withExponentialBackoff, withTimeout, getCachedInsight, setCachedInsight } from '../utils/aiHelpers'
+import { createTicket, submitLeaveRequest } from '../lib/companyStore'
+
+const agenticTools = [
+  {
+    functionDeclarations: [
+      {
+        name: 'createTicket',
+        description: 'Raises a helpdesk or IT ticket on behalf of the user. Call this when the user reports an IT issue or wants to raise a ticket.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING', description: 'A short, concise title for the ticket.' },
+            dept: { type: 'STRING', description: 'Department to route the ticket to (e.g., IT, HR, Finance)' },
+            priority: { type: 'STRING', description: 'Priority of the ticket (High, Medium, Low)' }
+          },
+          required: ['title', 'dept', 'priority']
+        }
+      },
+      {
+        name: 'submitLeaveRequest',
+        description: 'Applies for a leave request on behalf of the user. Call this when the user wants to take time off.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            type: { type: 'STRING', description: 'The type of leave (e.g., Annual Leave, Sick Leave, Unpaid Leave)' },
+            from: { type: 'STRING', description: 'Start date in YYYY-MM-DD format.' },
+            to: { type: 'STRING', description: 'End date in YYYY-MM-DD format.' },
+            reason: { type: 'STRING', description: 'Reason for the leave.' }
+          },
+          required: ['type', 'from', 'to', 'reason']
+        }
+      }
+    ]
+  }
+]
 
 // Note: In a production environment, it is highly recommended to move these 
 // AI API calls to Firebase Cloud Functions to securely hide the API key.
@@ -50,13 +85,28 @@ export async function askAssistant(message, context = {}, userId = null) {
         contents: prompt,
         config: {
           maxOutputTokens: 500,
-          temperature: 0.6
+          temperature: 0.6,
+          tools: agenticTools
         }
       })
       
-      if (!response.text) throw new Error('Gemini API returned no content')
-      
-      const answer = response.text.trim()
+      let answer = ''
+
+      if (response.functionCalls && response.functionCalls.length > 0) {
+        const call = response.functionCalls[0]
+        if (call.name === 'createTicket') {
+          const { title, dept, priority } = call.args
+          await createTicket(context.companyId, { employeeId: context.employeeId, employeeName: context.employeeName, title, dept, priority })
+          answer = `I have successfully raised a **${priority}** priority ticket for "**${title}**" and routed it to ${dept}. IT will get back to you shortly!`
+        } else if (call.name === 'submitLeaveRequest') {
+          const { type, from, to, reason } = call.args
+          await submitLeaveRequest(context.companyId, { employeeId: context.employeeId, employeeName: context.employeeName, type, from, to, reason })
+          answer = `I have successfully submitted your ${type} request from ${from} to ${to}. Your HR manager has been notified!`
+        }
+      } else {
+        if (!response.text) throw new Error('Gemini API returned no content')
+        answer = response.text.trim()
+      }
 
       // 2. Save to Firestore if authenticated
       if (userId) {
@@ -86,6 +136,18 @@ export async function askAssistant(message, context = {}, userId = null) {
   } catch (err) {
     console.error('Gemini API error:', parseAiError(err), err)
     return localAnswer(message)
+  }
+}
+
+export async function clearChatHistory(userId) {
+  if (!userId) return
+  try {
+    const q = query(collection(db, 'users', userId, 'chats'))
+    const snap = await getDocs(q)
+    const promises = snap.docs.map(d => deleteDoc(d.ref))
+    await Promise.all(promises)
+  } catch (e) {
+    console.error("Failed to clear chat history:", e)
   }
 }
 

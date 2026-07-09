@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Paperclip, CalendarX2 } from 'lucide-react'
+import { Paperclip, CalendarX2, Loader2, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { subscribeLeaveRequests, submitLeaveRequest, cancelLeaveRequest, subscribeEmployees } from '../../lib/companyStore'
+import { uploadDocument } from '../../lib/cloudSync'
 import PageHeader from '../../components/PageHeader'
 import { Card, Badge, DarkButton, Input, EmptyState, Skeleton } from '../../components/ui'
 import BottomNav from '../../components/BottomNav'
@@ -75,10 +76,28 @@ export function LeaveBalance() {
 export function ApplyLeave() {
   const navigate = useNavigate()
   const { companyId, user } = useAuth()
-  const [form, setForm] = useState({ type: 'Casual Leave', from: '', to: '', reason: '' })
+  const [form, setForm] = useState({ type: 'Casual Leave', from: '', to: '', reason: '', documentUrl: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(null)
+  const fileInputRef = useRef(null)
+  
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setUploadProgress(0)
+    try {
+      const doc = await uploadDocument(user.uid, file, { onProgress: setUploadProgress })
+      set('documentUrl', doc.url)
+    } catch (err) {
+      setError('Document upload failed.')
+    } finally {
+      setUploadProgress(null)
+    }
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -90,6 +109,7 @@ export function ApplyLeave() {
         employeeId: user.uid,
         employeeName: user.displayName || user.email,
         type: form.type, from: form.from, to: form.to, reason: form.reason,
+        documentUrl: form.documentUrl,
       })
       navigate('/app/leave/requests')
     } catch (err) {
@@ -126,8 +146,20 @@ export function ApplyLeave() {
             className="w-full rounded-xl border border-base-border bg-base-card px-4 py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-600"
           />
         </label>
-        <button type="button" disabled className="flex items-center gap-2 text-xs font-medium text-neutral-300">
-          <Paperclip size={14} /> Attach Document (coming soon)
+        <input type="file" className="hidden" ref={fileInputRef} onChange={handleFile} />
+        <button 
+          type="button" 
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadProgress !== null} 
+          className="flex items-center gap-2 text-xs font-medium text-neutral-900 hover:text-neutral-600 transition"
+        >
+          {uploadProgress !== null ? (
+            <><Loader2 size={14} className="animate-spin text-neutral-500" /> Uploading {uploadProgress}%...</>
+          ) : form.documentUrl ? (
+            <><CheckCircle2 size={14} className="text-accent-green" /> Document Attached</>
+          ) : (
+            <><Paperclip size={14} /> Attach Document</>
+          )}
         </button>
         {error && <p className="text-xs text-red-600">{error}</p>}
         <DarkButton type="submit" disabled={submitting} className="!bg-neutral-900 !text-white">

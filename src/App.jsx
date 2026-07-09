@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute, RoleRoute } from './components/ProtectedRoute'
+import { db } from './lib/store'
 
 import Splash from './pages/Splash'
 import Onboarding from './pages/Onboarding'
@@ -28,7 +29,7 @@ import { Payslip, Documents, Profile, SettingsPage } from './pages/more/MoreDeta
 import { HRDashboard } from './pages/dashboards/RoleDashboards'
 import IssuePayslip from './pages/payroll/IssuePayslip'
 
-import React from 'react'
+import React, { useEffect } from 'react'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -53,6 +54,18 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
+  useEffect(() => {
+    function applyTheme(data) {
+      if (data?.settings?.darkMode) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+    applyTheme(db.get())
+    return db.onChange((next) => applyTheme(next))
+  }, [])
+
   return (
     <ErrorBoundary>
       <Routes>

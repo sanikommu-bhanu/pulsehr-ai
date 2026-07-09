@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Sparkles, LifeBuoy } from 'lucide-react'
-import { askAssistant, aiConfigured } from '../../services/aiService'
+import { Send, Sparkles, LifeBuoy, Trash2 } from 'lucide-react'
+import { askAssistant, aiConfigured, clearChatHistory } from '../../services/aiService'
 import { useAuth } from '../../context/AuthContext'
 import BottomNav from '../../components/BottomNav'
 
@@ -9,7 +9,7 @@ const suggestions = ['Check my leave balance', 'Apply for leave', "What's my pay
 
 export default function Assistant() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, companyId } = useAuth()
   const firstName = (user?.displayName || user?.email || 'there').split(' ')[0]
   const [messages, setMessages] = useState([
     { role: 'assistant', text: `Hi ${firstName}! 👋 I'm your AI HR Assistant. How can I help you today?` },
@@ -45,9 +45,35 @@ export default function Assistant() {
     setMessages((m) => [...m, { role: 'user', text: msg }])
     setInput('')
     setLoading(true)
-    const reply = await askAssistant(msg, { name: firstName }, user?.uid)
+    const reply = await askAssistant(msg, { 
+      name: firstName,
+      companyId,
+      employeeId: user?.uid,
+      employeeName: user?.displayName || user?.email
+    }, user?.uid)
     setMessages((m) => [...m, { role: 'assistant', text: reply }])
     setLoading(false)
+  }
+
+  function formatMessage(text) {
+    // Splits text by markdown links: [Link Text](/path/to/page)
+    const parts = text.split(/(\[.*?\]\(.*?\))/g)
+    return parts.map((part, i) => {
+      const match = part.match(/\[(.*?)\]\((.*?)\)/)
+      if (match) {
+        return (
+          <button 
+            key={i} 
+            onClick={() => navigate(match[2])} 
+            className="mt-2.5 mb-1 block w-full rounded-xl bg-neutral-900 px-4 py-2.5 text-center text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800"
+          >
+            {match[1]}
+          </button>
+        )
+      }
+      // Render newlines as <br /> for better formatting
+      return <span key={i}>{part.split('\n').map((line, j) => <span key={j}>{line}<br/></span>)}</span>
+    })
   }
 
   return (
@@ -62,18 +88,31 @@ export default function Assistant() {
             <p className="text-[11px] text-accent-green">{aiConfigured ? 'Online' : 'Demo mode'}</p>
           </div>
         </div>
-        <button onClick={() => navigate('/app/helpdesk/chat')} className="flex items-center gap-1.5 rounded-full border border-base-border px-3 py-1.5 text-xs text-neutral-500">
-          <LifeBuoy size={13} /> Helpdesk
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={async () => {
+              if (confirm('Start a new chat? This will clear your history.')) {
+                setMessages([{ role: 'assistant', text: `Hi ${firstName}! 👋 I'm your AI HR Assistant. How can I help you today?` }])
+                if (user?.uid) await clearChatHistory(user.uid)
+              }
+            }} 
+            className="flex items-center gap-1.5 rounded-full border border-base-border px-3 py-1.5 text-xs text-neutral-500 hover:text-red-500 hover:border-red-200 transition-colors"
+          >
+            <Trash2 size={13} /> New Chat
+          </button>
+          <button onClick={() => navigate('/app/helpdesk/chat')} className="flex items-center gap-1.5 rounded-full border border-base-border px-3 py-1.5 text-xs text-neutral-500 hover:text-neutral-900 transition-colors">
+            <LifeBuoy size={13} /> Helpdesk
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 px-5 py-2">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-              m.role === 'user' ? 'bg-neutral-900 text-white' : 'bg-base-card text-neutral-900'
+            <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+              m.role === 'user' ? 'bg-neutral-900 text-white' : 'bg-base-card text-neutral-900 shadow-sm border border-base-border/50'
             }`}>
-              {m.text}
+              {m.role === 'user' ? m.text : formatMessage(m.text)}
             </div>
           </div>
         ))}

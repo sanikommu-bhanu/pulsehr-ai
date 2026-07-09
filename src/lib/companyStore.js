@@ -48,6 +48,7 @@ import {
   runTransaction,
   arrayUnion,
   arrayRemove,
+  deleteDoc,
 } from '../firebase'
 
 // ===========================================================================
@@ -428,6 +429,15 @@ export async function postAnnouncement(companyId, { title, body, image, authorNa
     return
   }
   lsInsert('announcements', payload)
+}
+
+export async function deleteAnnouncement(companyId, announcementId) {
+  if (firebaseConfigured) {
+    await deleteDoc(doc(firestore, 'companies', companyId, 'announcements', announcementId))
+    return
+  }
+  const rows = lsRead('announcements')
+  lsWrite('announcements', rows.filter(r => r.id !== announcementId))
 }
 
 export async function toggleLikeAnnouncement(companyId, announcementId, employeeId, isLiked) {

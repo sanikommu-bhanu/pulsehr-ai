@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Megaphone, ImagePlus, Heart, MessageCircle } from 'lucide-react'
+import { Megaphone, ImagePlus, Heart, MessageCircle, Trash } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { subscribeAnnouncements, postAnnouncement, toggleLikeAnnouncement, commentAnnouncement } from '../../lib/companyStore'
+import { subscribeAnnouncements, postAnnouncement, toggleLikeAnnouncement, commentAnnouncement, deleteAnnouncement } from '../../lib/companyStore'
 import PageHeader from '../../components/PageHeader'
 import { Card, DarkButton, EmptyState, Skeleton } from '../../components/ui'
 import BottomNav from '../../components/BottomNav'
@@ -113,7 +113,7 @@ export default function CompanyFeed() {
         )}
 
         {feed === null && Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40" />)}
-        {feed?.map((item) => <AnnouncementPost key={item.id} item={item} companyId={companyId} user={user} />)}
+        {feed?.map((item) => <AnnouncementPost key={item.id} item={item} companyId={companyId} user={user} role={role} />)}
         {feed?.length === 0 && (
           <EmptyState icon={ImagePlus} title="No announcements yet" body={role === 'admin' ? 'Post the first update above.' : 'Check back once HR posts an update.'} />
         )}
@@ -123,7 +123,7 @@ export default function CompanyFeed() {
   )
 }
 
-function AnnouncementPost({ item, companyId, user }) {
+function AnnouncementPost({ item, companyId, user, role }) {
   const [commenting, setCommenting] = useState(false)
   const [text, setText] = useState('')
   const likes = item.likes || []
@@ -142,10 +142,18 @@ function AnnouncementPost({ item, companyId, user }) {
   }
 
   return (
-    <Card className="!p-0 overflow-hidden">
+    <Card className="!p-0 overflow-hidden relative">
+      {role === 'admin' && (
+        <button 
+          onClick={() => { if(confirm('Delete this post?')) deleteAnnouncement(companyId, item.id) }} 
+          className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition hover:bg-red-500"
+        >
+          <Trash size={14} />
+        </button>
+      )}
       {item.image && <img src={item.image} alt="" className="h-40 w-full object-cover" />}
       <div className="p-4">
-        <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
+        <p className="text-sm font-semibold text-neutral-900 pr-8">{item.title}</p>
         <p className="mt-1 text-xs text-neutral-500 whitespace-pre-wrap"><Linkify text={item.body} /></p>
         <p className="mt-2 text-[11px] text-neutral-400">{item.authorName}</p>
         
