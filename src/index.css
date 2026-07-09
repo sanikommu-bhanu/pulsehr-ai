@@ -43,3 +43,36 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(188px); }
 }
+
+/* ==========================================================================
+   Dark Mode Overrides
+   These instantly invert the Tailwind utility classes when the app toggles Dark Mode.
+   ========================================================================== */
+html.dark, html.dark body, html.dark #root, html.dark .app-shell {
+  background-color: #0f0f0f !important;
+  color: #f5f5f5 !important;
+  color-scheme: dark;
+}
+
+html.dark .bg-base-bg { background-color: #0f0f0f !important; }
+html.dark .bg-base-card { background-color: #171717 !important; border-color: #262626 !important; }
+html.dark .bg-base-card2 { background-color: #262626 !important; }
+html.dark .bg-white { background-color: #171717 !important; }
+html.dark .bg-neutral-50 { background-color: #171717 !important; }
+html.dark .bg-neutral-100 { background-color: #262626 !important; }
+html.dark .bg-neutral-200 { background-color: #333333 !important; }
+
+html.dark .border-base-border { border-color: #333333 !important; }
+html.dark .border-neutral-200 { border-color: #333333 !important; }
+html.dark .border-neutral-100 { border-color: #262626 !important; }
+
+html.dark .text-neutral-900 { color: #f5f5f5 !important; }
+html.dark .text-neutral-800 { color: #e5e5e5 !important; }
+html.dark .text-neutral-700 { color: #d4d4d4 !important; }
+html.dark .text-neutral-600 { color: #a3a3a3 !important; }
+html.dark .text-neutral-500 { color: #737373 !important; }
+
+/* Invert solid black buttons/bars to white in dark mode */
+html.dark .bg-neutral-900 { background-color: #f5f5f5 !important; color: #171717 !important; }
+html.dark .text-white { color: #171717 !important; }
+
