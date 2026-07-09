@@ -1,7 +1,7 @@
 # PulseHR AI
 
 <div align="center">
-  <a href="YOUR_LIVE_DEMO_LINK_HERE">
+  <a href="https://pulsehr-ai-tawny.vercel.app/">
     <img src="https://img.shields.io/badge/Live%20Demo-%F0%9F%9A%80-blue?style=for-the-badge" alt="Live Demo" />
   </a>
   &nbsp;&nbsp;
@@ -11,9 +11,9 @@
 </div>
 <br/>
 
-## 🏆 HACKATHON JUDGES: HOW TO TEST
+HOW TO TEST
 
-Welcome judges! To truly experience this application, you must test the real-time syncing and the Agentic AI. The app works instantly with **zero configuration** (using a `BroadcastChannel` local backend).
+To truly experience this application, you must test the real-time syncing and the Agentic AI. The app works instantly with **zero configuration** (using a `BroadcastChannel` local backend).
 
 ### Step 1: Real-Time Sync Testing (Requires 2 Tabs)
 1. Open the Live Demo link in **Tab 1**. Sign up as **HR/Admin**. Note the 6-character Company Join Code.
