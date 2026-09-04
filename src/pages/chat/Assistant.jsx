@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Sparkles, LifeBuoy, Trash2 } from 'lucide-react'
+import { Send, Sparkles, LifeBuoy, Trash2, Mic } from 'lucide-react'
 import { askAssistant, aiConfigured, clearChatHistory } from '../../services/aiService'
 import { useAuth } from '../../context/AuthContext'
 import BottomNav from '../../components/BottomNav'
@@ -16,7 +16,35 @@ export default function Assistant() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const endRef = useRef(null)
+  const recognitionRef = useRef(null)
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition()
+      recognitionRef.current.continuous = false
+      recognitionRef.current.interimResults = false
+      recognitionRef.current.onresult = (e) => {
+        const transcript = e.results[0][0].transcript
+        setInput((prev) => prev ? `${prev} ${transcript}` : transcript)
+        setIsListening(false)
+      }
+      recognitionRef.current.onerror = () => setIsListening(false)
+      recognitionRef.current.onend = () => setIsListening(false)
+    }
+  }, [])
+
+  function toggleListening() {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+    } else {
+      recognitionRef.current?.start()
+      setIsListening(true)
+    }
+  }
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
@@ -141,9 +169,16 @@ export default function Assistant() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask HR anything…"
+          placeholder={isListening ? "Listening..." : "Ask HR anything…"}
           className="flex-1 rounded-full border border-base-border bg-base-card px-4 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral-600"
         />
+        <button 
+          type="button" 
+          onClick={toggleListening} 
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
+        >
+          <Mic size={16} />
+        </button>
         <button type="submit" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white">
           <Send size={16} />
         </button>
